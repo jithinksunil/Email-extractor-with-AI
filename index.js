@@ -1,10 +1,9 @@
 import express from 'express';
 import mongodb from './config/mongoose.js';
-import dotenv from 'dotenv';
 import { dirname, join } from 'path';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
-import authRouter from './routes/authRouter.js';
+import dotenv from 'dotenv';
 import gAuthRouter from './routes/gAuthRouter.js';
 const app = express();
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,8 +20,7 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use('/auth', authRouter);
-app.use('/gauth', gAuthRouter);
+app.use('/', gAuthRouter);
 
 app.listen(process.env.PORT, () => {
   console.log(`server started on port ${process.env.PORT}`);

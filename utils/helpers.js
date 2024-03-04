@@ -2,8 +2,11 @@ import OpenAI from 'openai';
 import { gmail, oauth2Client } from '../config/googleApis.js';
 import base64Url from 'base64url';
 import fs from 'fs';
+import dotenv from 'dotenv';
+
+dotenv.config();
 const openai = new OpenAI({
-  apiKey: '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',
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function emailAnalyser(subject = '', body = '') {

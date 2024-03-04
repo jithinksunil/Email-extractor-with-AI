@@ -9,7 +9,8 @@ import {
 } from '../utils/helpers.js';
 import { gmail, oauth2Client } from '../config/googleApis.js';
 import emailCollection from '../models/mailExtractedSchema.js';
-
+import dotenv from 'dotenv';
+dotenv.config();
 export const verifyAccess = async (req, res) => {
   try {
     const accessToken = req.headers.authorization;

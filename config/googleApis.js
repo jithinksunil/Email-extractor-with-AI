@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
-
+import dotenv from 'dotenv';
+dotenv.config();
 export const oauth2Client = new google.auth.OAuth2({
   clientId: process.env.CLIENT_ID,
   clientSecret: process.env.CLIENT_SECRET,
