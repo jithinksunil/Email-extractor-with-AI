@@ -3,7 +3,7 @@ import { gmail, oauth2Client } from '../config/googleApis.js';
 import base64Url from 'base64url';
 import fs from 'fs';
 const openai = new OpenAI({
-  apiKey: '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', // This is the default and can be omitted
+  apiKey: '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',
 });
 
 export async function emailAnalyser(subject = '', body = '') {
@@ -43,8 +43,7 @@ export async function emailAnalyser(subject = '', body = '') {
   });
   const answer = chatCompletion.choices[0].message.content;
 
-  const percentage = await parser(answer);
-  return percentage;
+  return await parser(answer);
 }
 
 async function parser(json, nthIteration = 1) {
@@ -117,7 +116,11 @@ async function parser(json, nthIteration = 1) {
 
 const findBody = (part) => {
   if (part.mimeType === 'text/plain' && part.body.size > 0) {
-    return part.body.data;
+    const emailBody = Buffer.from(part.body.data, 'base64').toString().trim();
+    const pattern = /To:.*?@gmail.com>\s*\n/;
+    const parts = emailBody.split(pattern);
+    const originalMessage = parts[parts.length - 1].trim();
+    return originalMessage;
   }
   let innerParts = part.parts;
   if (innerParts && innerParts.length > 0) {
@@ -130,7 +133,8 @@ const findBody = (part) => {
 const findSubject = (headers) => {
   for (const header of headers) {
     if (header.name === 'Subject') {
-      return header.value;
+      const parts = header.value.split('Fwd:');
+      return parts[parts.length - 1].trim();
     }
   }
   return '';
@@ -139,19 +143,18 @@ const findSubject = (headers) => {
 const findFromEmail = (headers) => {
   for (const header of headers) {
     if (header.name === 'From') {
-      return header.value;
+      return header.value?.split('<')[1]?.split('>')[0];
     }
   }
   return '';
 };
 
-export function decodeEmailBody(message) {
+export function decodeEmail(message) {
   const payload = message.payload;
-  const encodedText = findBody(payload);
-  const decodedText = Buffer.from(encodedText, 'base64').toString();
+  const body = findBody(payload);
   const subject = findSubject(payload.headers);
   const fromEmail = findFromEmail(payload.headers);
-  return { subject, body: decodedText, fromEmail };
+  return { subject, body, fromEmail };
 }
 
 export async function setCredentials(accessToken, refreshToken) {
@@ -177,11 +180,11 @@ export async function getMessages(maxResults = 100) {
 
 export async function filterOutEmails(messageId, emailAddress) {
   const msg = await getMessage(messageId);
+
   const payload = msg.payload;
   if (!payload?.parts || !payload.parts[1]?.body?.attachmentId) return;
 
-  const { subject, body, fromEmail } = decodeEmailBody(msg);
-
+  const { subject, body, fromEmail } = decodeEmail(msg);
   if (fromEmail.includes(emailAddress)) return;
 
   const percentage = await emailAnalyser(subject, body);

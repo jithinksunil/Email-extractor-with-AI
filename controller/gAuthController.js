@@ -52,7 +52,7 @@ export const getUser = async (req, res) => {
       await emailCollection.insertMany([
         {
           email: response.data.emailAddress,
-          messagesTotal: response.data.messagesTotal-3,
+          messagesTotal: response.data.messagesTotal - 10,
         },
       ]);
     }
@@ -161,7 +161,7 @@ export const analyseLastEmail = async (req, res) => {
       const email = await filterOutEmails(messages[i].id, emailAddress);
       if (email) {
         emailList.push(email);
-        console.log(`Email(${messages[i].id})-->Attached with a pitchdeck`);
+        console.log(`Email(${messages[i].id})-->Attached a pitchdeck`);
       } else {
         console.log(`Email(${messages[i].id})-->Does not contain a pitchdeck`);
       }
