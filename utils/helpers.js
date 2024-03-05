@@ -117,7 +117,8 @@ async function parser(json, nthIteration = 1) {
   }
 }
 
-const findBody = (part) => {
+const findBody = (payload) => {
+  const part=payload
   if (part.mimeType === 'text/plain' && part.body.size > 0) {
     const emailBody = Buffer.from(part.body.data, 'base64').toString().trim();
     const pattern = /To:.*?@gmail.com>\s*\n/;
