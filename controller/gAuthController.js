@@ -53,7 +53,7 @@ export const getUser = async (req, res) => {
       await emailCollection.insertMany([
         {
           email: response.data.emailAddress,
-          messagesTotal: response.data.messagesTotal - 10,
+          messagesTotal: response.data.messagesTotal - 12,
         },
       ]);
     }

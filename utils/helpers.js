@@ -159,7 +159,7 @@ export function decodeEmail(payload) {
   return { subject, body, fromEmail };
 }
 
-export async function setCredentials(accessToken, refreshToken) {
+export function setCredentials(accessToken, refreshToken) {
   oauth2Client.setCredentials({
     access_token: accessToken,
     refresh_token: refreshToken,
@@ -200,7 +200,7 @@ export async function filterOutEmails(messageId, emailAddress) {
       payload.parts[i].body.attachmentId,
       messageId
     );
-    const fileName = saveAttachment(attachment);
+    const fileName = saveAttachment(attachment, payload.parts[i].filename);
     attachments.push(fileName);
   }
   return { subject, body, attachments, from: fromEmail };
@@ -223,8 +223,7 @@ export async function getAttachment(id, messageId) {
   return base64Url.toBuffer(attachment?.data.data);
 }
 
-export async function saveAttachment(attachment) {
-  const oldFileName = payload.parts[i].filename;
+export function saveAttachment(attachment, oldFileName) {
   const splitedArray = oldFileName.split('.');
   const fileExtension = splitedArray.pop();
   const fileName = `${splitedArray.join('.')}${Date.now()}.${fileExtension}`;
