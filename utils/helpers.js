@@ -101,7 +101,7 @@ async function parser(json, nthIteration = 1) {
         {
           role: 'system',
           content:
-            'return the probability in json format like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100',
+            'return the final probability in json format like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100',
         },
         {
           role: 'system',
@@ -152,8 +152,7 @@ const findFromEmail = (headers) => {
   return '';
 };
 
-export function decodeEmail(message) {
-  const payload = message.payload;
+export function decodeEmail(payload) {
   const body = findBody(payload);
   const subject = findSubject(payload.headers);
   const fromEmail = findFromEmail(payload.headers);
@@ -187,7 +186,7 @@ export async function filterOutEmails(messageId, emailAddress) {
   const payload = msg.payload;
   if (!payload?.parts || !payload.parts[1]?.body?.attachmentId) return;
 
-  const { subject, body, fromEmail } = decodeEmail(msg);
+  const { subject, body, fromEmail } = decodeEmail(payload);
   if (fromEmail.includes(emailAddress)) return;
 
   const percentage = await emailAnalyser(subject, body);
@@ -201,16 +200,8 @@ export async function filterOutEmails(messageId, emailAddress) {
       payload.parts[i].body.attachmentId,
       messageId
     );
-    const decodedData = base64Url.toBuffer(attachment.data);
-
-    // Save the attachment to a file
-    const oldFileName = payload.parts[i].filename;
-    const splitedArray = oldFileName.split('.');
-    const fileExtension = splitedArray.pop();
-    const fileName = `${splitedArray.join('.')}${Date.now()}.${fileExtension}`;
+    const fileName = saveAttachment(attachment);
     attachments.push(fileName);
-    fs.writeFileSync(`./attachmentsDownloaded/${fileName}`, decodedData);
-    console.log('Attachment saved');
   }
   return { subject, body, attachments, from: fromEmail };
 }
@@ -229,5 +220,15 @@ export async function getAttachment(id, messageId) {
     messageId,
     id,
   });
-  return attachment?.data;
+  return base64Url.toBuffer(attachment?.data.data);
+}
+
+export async function saveAttachment(attachment) {
+  const oldFileName = payload.parts[i].filename;
+  const splitedArray = oldFileName.split('.');
+  const fileExtension = splitedArray.pop();
+  const fileName = `${splitedArray.join('.')}${Date.now()}.${fileExtension}`;
+  fs.writeFileSync(`./attachmentsDownloaded/${fileName}`, attachment);
+  console.log('Attachment saved');
+  return fileName;
 }
