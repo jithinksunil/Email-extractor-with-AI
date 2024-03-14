@@ -12,113 +12,24 @@ const openai = new OpenAI({
 export async function emailAnalyser(subject = '', body = '') {
   console.log('subject--->', subject);
   console.log('body------>', body);
-  const chatCompletion = await openai.chat.completions.create({
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Understand what is pitchdeck of a portfolio company or a startup from internet',
-      },
-      {
-        role: 'system',
-        content:
-          'I will feed the subject line and email body of an email to understand wheather a pitchdeck file is attached with the email or not',
-      },
-      {
-        role: 'system',
-        content:
-          'Analyse both subject line and email body to find the presence of a pitchdeck',
-      },
-      {
-        role: 'system',
-        content:
-          'Find the probability of attaching a pitchdeck with the email.',
-      },
-      {
-        role: 'system',
-        content:
-          'Give the probability in a json formate like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100. Should not give a description, the json format output is mandatory. If u cannot process the probabiliy in any case give the probability as 0 in the mentioned json format',
-      },
-      { role: 'user', content: `Email Subject :${subject}` },
-      { role: 'user', content: `Email body:${body} ` },
-    ],
-    model: 'gpt-3.5-turbo',
-  });
-  const answer = chatCompletion.choices[0].message.content;
-
-  return await parser(answer);
-}
-
-async function parser(json, nthIteration = 1) {
-  if (nthIteration >= 5) return 0;
+  const cleanedSubject = cleanString(subject);
+  const cleanedBody = cleanString(body);
   try {
-    const parsedData = JSON.parse(json);
-    const percentage = parsedData.probability;
-    console.log(json);
-    if (typeof percentage === 'number') {
-      return percentage;
-    }
-    const chatCompletion1 = await openai.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: 'I will give a json',
-        },
-        {
-          role: 'system',
-          content:
-            'Find the probability and give the probability exactly in json format like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100',
-        },
-        {
-          role: 'system',
-          content:
-            'Should not give a description, the json format output is mandatory',
-        },
-        { role: 'user', content: parsedData },
-      ],
-      model: 'gpt-3.5-turbo',
-    });
-    const answer1 = chatCompletion1.choices[0].message.content;
-
-    return await parser(answer1, nthIteration + 1);
+    return await analyseWithGoogle_Flan_t5_xxl(cleanedSubject, cleanedBody);
   } catch (error) {
-    const chatCompletion2 = await openai.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: 'I will give a description, rephrase it.',
-        },
-        {
-          role: 'system',
-          content:
-            'Understand the context and find the probability mentioned in the rephrased description',
-        },
-        {
-          role: 'system',
-          content:
-            'If the descrption do not saying anything about probability consider probabity as 0',
-        },
-        {
-          role: 'system',
-          content:
-            'return the final probability in json format like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100',
-        },
-        {
-          role: 'system',
-          content:
-            'Should not give a description, the json format output is mandatory',
-        },
-        { role: 'user', content: json },
-      ],
-      model: 'gpt-3.5-turbo',
-    });
-    const answer2 = chatCompletion2.choices[0].message.content;
-    return await parser(answer2, nthIteration + 1);
+    console.log(error);
+    try {
+      return await analyseWithOpenAi(cleanedSubject, cleanedBody);
+    } catch (error) {
+      console.log(error, 'Both LLM models failed to analyse ');
+      //Do something
+      return false;
+    }
   }
 }
 
 const findBody = (payload) => {
-  const part=payload
+  const part = payload;
   if (part.mimeType === 'text/plain' && part.body.size > 0) {
     const emailBody = Buffer.from(part.body.data, 'base64').toString().trim();
     const pattern = /To:.*?@gmail.com>\s*\n/;
@@ -188,12 +99,12 @@ export async function filterOutEmails(messageId, emailAddress) {
   if (!payload?.parts || !payload.parts[1]?.body?.attachmentId) return;
 
   const { subject, body, fromEmail } = decodeEmail(payload);
-  if (fromEmail.includes(emailAddress)) return;
+  if (!fromEmail || fromEmail.includes(emailAddress)) return;
 
-  const percentage = await emailAnalyser(subject, body);
+  const pitchdeckExist = await emailAnalyser(subject, body);
 
-  if (!(percentage > 60)) return;
-  console.log('%>60');
+  if (!pitchdeckExist) return;
+  console.log('Pitchdeck exists');
 
   const attachments = [];
   for (let i = 1; i < payload.parts.length; i++) {
@@ -231,4 +142,143 @@ export function saveAttachment(attachment, oldFileName) {
   fs.writeFileSync(`./attachmentsDownloaded/${fileName}`, attachment);
   console.log('Attachment saved');
   return fileName;
+}
+
+async function analyseWithOpenAi(subject, body) {
+  const chatCompletion = await openai.chat.completions.create({
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Understand what is pitchdeck of a portfolio company or a startup from internet',
+      },
+      {
+        role: 'system',
+        content:
+          'I will feed the subject line and email body of an email to understand wheather a pitchdeck file is attached with the email or not',
+      },
+      {
+        role: 'system',
+        content:
+          'Analyse both subject line and email body to find the presence of a pitchdeck',
+      },
+      {
+        role: 'system',
+        content:
+          'Find the probability of attaching a pitchdeck with the email.',
+      },
+      {
+        role: 'system',
+        content:
+          'Give the probability in a json formate like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100. Should not give a description, the json format output is mandatory. If u cannot process the probabiliy in any case give the probability as 0 in the mentioned json format',
+      },
+      { role: 'user', content: `Email Subject :${subject}` },
+      { role: 'user', content: `Email body:${body} ` },
+    ],
+    model: 'gpt-3.5-turbo',
+  });
+  const answer = chatCompletion.choices[0].message.content;
+
+  return await parser(answer);
+}
+
+async function parser(json, nthIteration = 1) {
+  if (nthIteration >= 5) return 0;
+  try {
+    const parsedData = JSON.parse(json);
+    const percentage = parsedData.probability;
+    console.log(json, `Analysed using OpenAi`);
+    if (typeof percentage === 'number') {
+      return percentage >= 60;
+    }
+    const chatCompletion1 = await openai.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: 'I will give a json',
+        },
+        {
+          role: 'system',
+          content:
+            'Find the probability and give the probability exactly in json format like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100',
+        },
+        {
+          role: 'system',
+          content:
+            'Should not give a description, the json format output is mandatory',
+        },
+        { role: 'user', content: parsedData },
+      ],
+      model: 'gpt-3.5-turbo',
+    });
+    const answer1 = chatCompletion1.choices[0].message.content;
+
+    return await parser(answer1, nthIteration + 1);
+  } catch (error) {
+    const chatCompletion2 = await openai.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: 'I will give a description, rephrase it.',
+        },
+        {
+          role: 'system',
+          content:
+            'Understand the context and find the probability mentioned in the rephrased description',
+        },
+        {
+          role: 'system',
+          content:
+            'If the descrption do not saying anything about probability consider probabity as 0',
+        },
+        {
+          role: 'system',
+          content:
+            'return the final probability in json format like { "probability": x as number } on a scale of 1 to 100 where x is a number in between 0 and 100',
+        },
+        {
+          role: 'system',
+          content:
+            'Should not give a description, the json format output is mandatory',
+        },
+        { role: 'user', content: json },
+      ],
+      model: 'gpt-3.5-turbo',
+    });
+    const answer2 = chatCompletion2.choices[0].message.content;
+    return await parser(answer2, nthIteration + 1);
+  }
+}
+
+async function analyseWithGoogle_Flan_t5_xxl(subject, body) {
+  const response = await fetch(
+    'https://api-inference.huggingface.co/models/google/flan-t5-xxl',
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.HUGGINGFACE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      body: JSON.stringify({
+        inputs: `I will feed you the subject and body of an email.Understand the context and tell me wheather the email is attached with a document called pitchdeck. Tell me yes if the email is attached with a pitchdeck and no if the email is not attached with a pitchdeck .The subject of the email is "${subject}" and the body of email is "${body}".`,
+      }),
+    }
+  );
+
+  const result = await response.json();
+  if (!Array.isArray(result)) return Promise.reject(result);
+  const answer = result[0].generated_text;
+  if (answer === 'yes') {
+    console.log(JSON.stringify(result[0]), `Analysed using Google_Flan_t5_xxl`);
+    return true;
+  }
+  if (answer === 'no') {
+    console.log(JSON.stringify(result[0]), `Analysed using Google_Flan_t5_xxl`);
+    return false;
+  }
+  return Promise.reject('Failed to analyse the email content');
+}
+
+function cleanString(string) {
+  return string.replace(/\s+/g, ' ');
 }
