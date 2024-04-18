@@ -53,7 +53,7 @@ export const getUser = async (req, res) => {
       await emailCollection.insertMany([
         {
           email: response.data.emailAddress,
-          messagesTotal: response.data.messagesTotal-50,
+          messagesTotal: response.data.messagesTotal - 50,
         },
       ]);
     }
@@ -149,13 +149,19 @@ export const analyseLastEmail = async (req, res) => {
     const accessToken = req.headers.authorization;
     setCredentials(accessToken);
     const { emailAddress, messagesTotal } = await getUserDetails();
+    console.log(emailAddress, messagesTotal);
     let filteredEmails = await emailCollection.findOne({
       email: emailAddress,
     });
+    console.log(filteredEmails);
     const messages = await getMessages();
+    console.log(messages);
     const emailList = [];
     for (
-      let i = messagesTotal - filteredEmails.messagesTotal - 1;
+      let i =
+        messagesTotal - filteredEmails.messagesTotal - 1 >= 99
+          ? 99
+          : messagesTotal - filteredEmails.messagesTotal - 1;
       i >= 0;
       i--
     ) {
@@ -186,3 +192,29 @@ export const analyseLastEmail = async (req, res) => {
     });
   }
 };
+
+export async function webhook(req, res) {
+  return analyseLastEmail(req, res);
+}
+
+export async function subscribe(req, res) {
+  const accessToken = req.headers.authorization;
+  setCredentials(accessToken);
+  gmail.users.watch(
+    {
+      userId: 'me',
+      requestBody: {
+        labelIds: ['INBOX'], // Specify the label(s) to watch for changes
+        topicName: process.env.TOPIC_NAME, // Replace with your Cloud Pub/Sub topic
+      },
+    },
+    (err, response) => {
+      if (err) {
+        console.error('Error subscribing to push notifications:', err);
+        return res.status(200).json({ message: 'Error in subscription' });
+      }
+      console.log('Subscription response:', response.data);
+      return res.status(200).json({ message: 'Subscription successFull' });
+    }
+  );
+}

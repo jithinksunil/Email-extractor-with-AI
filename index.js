@@ -20,7 +20,7 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use('/', gAuthRouter);
+app.use('/api', gAuthRouter);
 
 app.listen(process.env.PORT, () => {
   console.log(`server started on port ${process.env.PORT}`);
